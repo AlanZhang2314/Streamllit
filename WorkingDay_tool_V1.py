@@ -455,7 +455,7 @@ def main():
 
     uploader_key = f"uploader_{st.session_state.uploader_key}"
     uploaded_files = st.file_uploader(
-        "添加数据文件 (Excel/CSV)【注意：不支持xls格式，导入数据删除前面非列名的行!",
+        "添加数据文件 (Excel/CSV) 【注意：导入的数据不支持xls格式，导入数据前删除前面非列名的行，并存为xlsx格式!】",
         type=['xlsx', 'csv'],
         accept_multiple_files=True,
         key=uploader_key

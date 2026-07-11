@@ -13,22 +13,28 @@ from io import BytesIO
 YEAR = 2026
 DATE_FORMATS = ["%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d/%m/%Y"]
 COLUMN_MAPPING = {
-    "姓名": ["幼儿姓名","姓名", "name", "学生姓名"],
-    "学生休假开始日期": ["请假开始日","请假开始日2","开始日期", "休假开始", "start", "开始"],
-    "学生休假结束日期": ["请假截止日","请假截止日2","结束日期", "休假结束", "end", "截止"],
+    "姓名": ["幼儿姓名", "姓名", "name", "学生姓名"],
+    "学生休假开始日期": ["请假开始日", "请假开始日2", "开始日期", "休假开始", "start", "开始"],
+    "学生休假结束日期": ["请假截止日", "请假截止日2", "结束日期", "休假结束", "end", "截止"],
 }
 INVALID_FILENAME_CHARS = r'[\\/*?:"<>|]'
+
 
 # ==================== 工具函数 ====================
 def format_date_list(dates: List[date]) -> str:
     return ', '.join(d.strftime('%Y-%m-%d') for d in dates)
 
+
 def safe_filename(name: str) -> str:
     return re.sub(INVALID_FILENAME_CHARS, '_', name)
+
 
 def parse_date_robust(val):
     if pd.isna(val):
         return None
+    # 处理 pandas Timestamp
+    if isinstance(val, pd.Timestamp):
+        return val.date()
     if isinstance(val, (datetime, date)):
         return val if isinstance(val, date) else val.date()
     if isinstance(val, (int, float)):
@@ -46,6 +52,7 @@ def parse_date_robust(val):
         return pd.to_datetime(s).date()
     except:
         return None
+
 
 # ==================== HolidayManager ====================
 class HolidayManager:
@@ -184,6 +191,7 @@ class HolidayManager:
             data.append([idx, typ, name, d.strftime('%Y-%m-%d')])
         return pd.DataFrame(data, columns=['序号', '类型', '名称', '日期'])
 
+
 # ==================== StatisticsEngine（修改核心逻辑） ====================
 class StatisticsEngine:
     def __init__(self, holiday_mgr: HolidayManager):
@@ -198,6 +206,13 @@ class StatisticsEngine:
         """
         if start_date > end_date:
             raise ValueError("开始日期不能晚于结束日期")
+
+        # ---------- 强制转换为 date 类型 ----------
+        if isinstance(start_date, datetime):
+            start_date = start_date.date()
+        if isinstance(end_date, datetime):
+            end_date = end_date.date()
+        # ---------------------------------------------
 
         full_months = 0
         workday_count = 0
@@ -312,18 +327,19 @@ class StatisticsEngine:
                     '周末日期': format_date_list(stats['weekends']),
                 })
             except ValueError as e:
-                errors.append(f"第{idx+2}行错误: {e}")
+                errors.append(f"第{idx + 2}行错误: {e}")
 
         df_result = pd.DataFrame(results)
         file_name = os.path.splitext(os.path.basename(file_path))[0]
         return file_name, df_result, errors
+
 
 # ==================== Streamlit 应用 ====================
 def init_session_state():
     if 'holiday_mgr' not in st.session_state:
         st.session_state.holiday_mgr = HolidayManager()
     if 'files' not in st.session_state:
-        st.session_state.files = []          # 元素: {'name': str, 'data': bytes}
+        st.session_state.files = []  # 元素: {'name': str, 'data': bytes}
     if 'results' not in st.session_state:
         st.session_state.results = {}
     if 'all_results_df' not in st.session_state:
@@ -334,6 +350,7 @@ def init_session_state():
         st.session_state.error_messages = []
     if 'uploader_key' not in st.session_state:
         st.session_state.uploader_key = 0
+
 
 def main():
     st.set_page_config(page_title="休假期间工作日统计工具 (2026)", layout="wide")
@@ -431,7 +448,8 @@ def main():
                 os.unlink(tmp_path)
 
         st.sidebar.divider()
-        st.sidebar.markdown('<div class="sidebar-footer">Author：Alan &nbsp;|&nbsp; Thanks：Jiao Xu</div>', unsafe_allow_html=True)
+        st.sidebar.markdown('<div class="sidebar-footer">Author：Alan &nbsp;|&nbsp; Thanks：Jiao Xu</div>',
+                            unsafe_allow_html=True)
 
     st.markdown('<div class="main-title">🐮  休假期间工作日统计工具 (2026) 🐴</div>', unsafe_allow_html=True)
 
@@ -476,7 +494,8 @@ def main():
                         df_copy = df.copy()
                         df_copy.insert(0, '文件名', name)
                         all_dfs.append(df_copy)
-                    st.session_state.all_results_df = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
+                    st.session_state.all_results_df = pd.concat(all_dfs,
+                                                                ignore_index=True) if all_dfs else pd.DataFrame()
                 st.rerun()
         st.divider()
     else:
@@ -495,7 +514,7 @@ def main():
             engine = StatisticsEngine(st.session_state.holiday_mgr)
 
             for idx, file_dict in enumerate(st.session_state.files):
-                progress_bar.progress((idx) / total, text=f"正在处理: {file_dict['name']} ({idx+1}/{total})")
+                progress_bar.progress((idx) / total, text=f"正在处理: {file_dict['name']} ({idx + 1}/{total})")
                 suffix = '.csv' if file_dict['name'].endswith('.csv') else '.xlsx'
                 with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                     tmp.write(file_dict['data'])
@@ -519,7 +538,8 @@ def main():
 
             progress_bar.progress(1.0, text="统计完成！")
             st.session_state.processing = False
-            st.success(f"✅ 统计完成！共处理 {len(st.session_state.files)} 个文件，{len(st.session_state.all_results_df)} 条记录。")
+            st.success(
+                f"✅ 统计完成！共处理 {len(st.session_state.files)} 个文件，{len(st.session_state.all_results_df)} 条记录。")
             st.rerun()
 
     with col2:
@@ -568,10 +588,12 @@ def main():
         st.subheader(f"📋 统计结果 ({len(st.session_state.all_results_df)} 条记录)")
         display_df = st.session_state.all_results_df.copy()
         if '开始日期' in display_df.columns:
-            display_df['开始日期'] = display_df['开始日期'].apply(lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else '')
-            display_df['结束日期'] = display_df['结束日期'].apply(lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else '')
+            display_df['开始日期'] = display_df['开始日期'].apply(
+                lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else '')
+            display_df['结束日期'] = display_df['结束日期'].apply(
+                lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else '')
         st.dataframe(display_df, use_container_width=True)
 
-   
+
 if __name__ == "__main__":
     main()

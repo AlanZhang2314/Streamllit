@@ -17,14 +17,13 @@ COLUMN_MAPPING = {
     "学生休假开始日期": ["开始日期", "休假开始", "start", "开始"],
     "学生休假结束日期": ["结束日期", "休假结束", "end", "结束"],
 }
-INVALID_FILENAME_CHARS = r'[\\/*?:"<>|]'   # 不包含中文，中文字符保留
+INVALID_FILENAME_CHARS = r'[\\/*?:"<>|]'
 
 # ==================== 工具函数 ====================
 def format_date_list(dates: List[date]) -> str:
     return ', '.join(d.strftime('%Y-%m-%d') for d in dates)
 
 def safe_filename(name: str) -> str:
-    """移除文件名中的非法字符（保留中文）"""
     return re.sub(INVALID_FILENAME_CHARS, '_', name)
 
 def parse_date_robust(val):
@@ -185,12 +184,18 @@ class HolidayManager:
             data.append([idx, typ, name, d.strftime('%Y-%m-%d')])
         return pd.DataFrame(data, columns=['序号', '类型', '名称', '日期'])
 
-# ==================== StatisticsEngine ====================
+# ==================== StatisticsEngine（修改核心逻辑） ====================
 class StatisticsEngine:
     def __init__(self, holiday_mgr: HolidayManager):
         self.holiday_mgr = holiday_mgr
 
     def collect_date_categories_v2(self, start_date: date, end_date: date) -> Dict:
+        """
+        统计区间内：
+        - full_months: 完整自然月数（该月所有天数都在区间内）
+        - workdays: 非完整月份中的工作日天数（完整月不计入）
+        - 各类日期列表（包含完整月和非完整月的所有日期）
+        """
         if start_date > end_date:
             raise ValueError("开始日期不能晚于结束日期")
 
@@ -202,18 +207,19 @@ class StatisticsEngine:
 
         cur = date(start_date.year, start_date.month, 1)
         while cur <= end_date:
+            # 计算当月最后一天
             if cur.month == 12:
                 next_month = date(cur.year + 1, 1, 1)
             else:
                 next_month = date(cur.year, cur.month + 1, 1)
             last_day = next_month - timedelta(days=1)
 
+            # 判断该月是否完全包含在区间内
             if start_date <= cur and end_date >= last_day:
+                # 完整自然月：只计数，不累加工作日
                 full_months += 1
                 d = cur
                 while d <= last_day:
-                    if self.holiday_mgr.is_workday(d):
-                        workday_count += 1
                     cat, _ = self.holiday_mgr.classify_date(d)
                     if cat == 'holiday':
                         holidays.append(d)
@@ -223,6 +229,7 @@ class StatisticsEngine:
                         makeups.append(d)
                     d += timedelta(days=1)
             else:
+                # 非完整月：遍历区间覆盖的天数，累加工作日
                 month_start = max(start_date, cur)
                 month_end = min(end_date, last_day)
                 d = month_start
@@ -237,6 +244,7 @@ class StatisticsEngine:
                     elif cat == 'makeup':
                         makeups.append(d)
                     d += timedelta(days=1)
+
             cur = next_month
 
         return {
@@ -325,18 +333,17 @@ def init_session_state():
     if 'error_messages' not in st.session_state:
         st.session_state.error_messages = []
     if 'uploader_key' not in st.session_state:
-        st.session_state.uploader_key = 0   # 用于重置上传组件
+        st.session_state.uploader_key = 0
 
 def main():
-    st.set_page_config(page_title="休假期间工作日统计工具 (2026)", layout="wide")
+    st.set_page_config(page_title="休假工作日统计工具 (2026)", layout="wide")
     init_session_state()
 
-    # ---------- 自定义 CSS 美化 ----------
     st.markdown("""
     <style>
         .main-title {
             color: #1f77b4;
-            font-size: 2.3rem;
+            font-size: 2.5rem;
             font-weight: bold;
             margin-bottom: 1rem;
         }
@@ -373,7 +380,6 @@ def main():
     </style>
     """, unsafe_allow_html=True)
 
-    # ----- 侧边栏：节假日管理 -----
     with st.sidebar:
         st.header("📅 节假日配置")
         st.write(st.session_state.holiday_mgr.get_summary())
@@ -424,14 +430,11 @@ def main():
             finally:
                 os.unlink(tmp_path)
 
-        # ---- 侧边栏底部：作者与感谢 ----
         st.sidebar.divider()
-        st.sidebar.markdown('<div class="sidebar-footer">Author：Alan &nbsp;|&nbsp; Thanks：徐娇</div>', unsafe_allow_html=True)
+        st.sidebar.markdown('<div class="sidebar-footer">作者：Alan &nbsp;|&nbsp; 感谢：徐娇</div>', unsafe_allow_html=True)
 
-    # ----- 主区域 -----
-    st.markdown('<div class="main-title"> 🐮  休假期间工作日统计工具 (2026)  🐴</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">🧑‍💼 休假工作日统计工具 (2026)</div>', unsafe_allow_html=True)
 
-    # ---------- 文件上传 ----------
     uploader_key = f"uploader_{st.session_state.uploader_key}"
     uploaded_files = st.file_uploader(
         "添加数据文件 (Excel/CSV)",
@@ -451,7 +454,6 @@ def main():
         st.session_state.uploader_key += 1
         st.rerun()
 
-    # ---------- 文件列表 ----------
     if st.session_state.files:
         st.subheader(f"已添加文件 ({len(st.session_state.files)})")
         cols = st.columns([4, 1, 1])
@@ -480,7 +482,6 @@ def main():
     else:
         st.info("请上传数据文件")
 
-    # ---------- 统计与导出 ----------
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
         if st.button("🚀 开始统计", disabled=st.session_state.processing or not st.session_state.files):
@@ -558,13 +559,11 @@ def main():
                 mime="application/zip"
             )
 
-    # ---------- 显示错误信息 ----------
     if st.session_state.error_messages:
         with st.expander("⚠️ 统计警告/错误"):
             for msg in st.session_state.error_messages:
                 st.warning(msg)
 
-    # ---------- 显示结果表格 ----------
     if not st.session_state.all_results_df.empty:
         st.subheader(f"📋 统计结果 ({len(st.session_state.all_results_df)} 条记录)")
         display_df = st.session_state.all_results_df.copy()
@@ -573,6 +572,8 @@ def main():
             display_df['结束日期'] = display_df['结束日期'].apply(lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else '')
         st.dataframe(display_df, use_container_width=True)
 
+    st.divider()
+    st.markdown('<div class="footer">作者：Alan &nbsp;|&nbsp; 感谢：徐娇</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

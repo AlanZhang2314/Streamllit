@@ -13,7 +13,7 @@ from io import BytesIO
 YEAR = 2026
 DATE_FORMATS = ["%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d/%m/%Y"]
 COLUMN_MAPPING = {
-    "姓名": ["姓名", "name", "员工姓名"],
+    "姓名": ["姓名", "name", "学生姓名"],
     "学生休假开始日期": ["开始日期", "休假开始", "start", "开始"],
     "学生休假结束日期": ["结束日期", "休假结束", "end", "结束"],
 }
@@ -336,7 +336,7 @@ def init_session_state():
         st.session_state.uploader_key = 0
 
 def main():
-    st.set_page_config(page_title="休假工作日统计工具 (2026)", layout="wide")
+    st.set_page_config(page_title="休假期间工作日统计工具 (2026)", layout="wide")
     init_session_state()
 
     st.markdown("""
@@ -392,8 +392,8 @@ def main():
                 st.dataframe(df_config, use_container_width=True)
 
         st.divider()
-        st.subheader("导入配置")
-        imported_file = st.file_uploader("选择配置文件 (CSV/Excel)", type=['csv', 'xlsx', 'xls'],
+        st.subheader("导入节假日配置")
+        imported_file = st.file_uploader("选择节假日配置文件 (CSV/Excel)", type=['csv', 'xlsx', 'xls'],
                                          key="import_holiday")
         if imported_file is not None:
             suffix = '.csv' if imported_file.name.endswith('.csv') else '.xlsx'
@@ -409,9 +409,9 @@ def main():
             finally:
                 os.unlink(tmp_path)
 
-        st.subheader("导出配置")
+        st.subheader("导出节假日配置")
         export_format = st.radio("导出格式", ["CSV", "Excel"], horizontal=True)
-        if st.button("导出配置"):
+        if st.button("导出节假日配置"):
             suffix = '.csv' if export_format == "CSV" else '.xlsx'
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp_path = tmp.name
@@ -420,7 +420,7 @@ def main():
                 with open(tmp_path, 'rb') as f:
                     data = f.read()
                 st.download_button(
-                    label="📥 下载配置文件",
+                    label="📥 下载节假日配置文件",
                     data=data,
                     file_name=f"holiday_config_{YEAR}{suffix}",
                     mime="text/csv" if suffix == '.csv' else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -431,9 +431,9 @@ def main():
                 os.unlink(tmp_path)
 
         st.sidebar.divider()
-        st.sidebar.markdown('<div class="sidebar-footer">作者：Alan &nbsp;|&nbsp; 感谢：徐娇</div>', unsafe_allow_html=True)
+        st.sidebar.markdown('<div class="sidebar-footer">Author：Alan &nbsp;|&nbsp; Thanks：Jiao Xu</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title">🧑‍💼 休假工作日统计工具 (2026)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">🐮  休假工作日统计工具 (2026) 🐴</div>', unsafe_allow_html=True)
 
     uploader_key = f"uploader_{st.session_state.uploader_key}"
     uploaded_files = st.file_uploader(
@@ -572,8 +572,6 @@ def main():
             display_df['结束日期'] = display_df['结束日期'].apply(lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else '')
         st.dataframe(display_df, use_container_width=True)
 
-    st.divider()
-    st.markdown('<div class="footer">作者：Alan &nbsp;|&nbsp; 感谢：徐娇</div>', unsafe_allow_html=True)
-
+   
 if __name__ == "__main__":
     main()

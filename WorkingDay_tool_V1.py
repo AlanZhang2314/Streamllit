@@ -410,7 +410,7 @@ def main():
 
         st.divider()
         st.subheader("导入节假日配置")
-        imported_file = st.file_uploader("选择节假日配置文件 (CSV/Excel)", type=['csv', 'xlsx', 'xls'],
+        imported_file = st.file_uploader("选择节假日配置文件 (CSV/Excel)", type=['csv', 'xlsx'],
                                          key="import_holiday")
         if imported_file is not None:
             suffix = '.csv' if imported_file.name.endswith('.csv') else '.xlsx'
@@ -455,8 +455,8 @@ def main():
 
     uploader_key = f"uploader_{st.session_state.uploader_key}"
     uploaded_files = st.file_uploader(
-        "添加数据文件 (Excel/CSV)",
-        type=['xlsx', 'xls', 'csv'],
+        "添加数据文件 (Excel/CSV)" 【注意：不支持xls格式，导入数据删除前面非列名的行】
+        type=['xlsx', 'csv'],
         accept_multiple_files=True,
         key=uploader_key
     )

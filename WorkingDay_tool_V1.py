@@ -433,7 +433,7 @@ def main():
         st.sidebar.divider()
         st.sidebar.markdown('<div class="sidebar-footer">Author：Alan &nbsp;|&nbsp; Thanks：Jiao Xu</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="main-title">🐮  休假工作日统计工具 (2026) 🐴</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">🐮  休假期间工作日统计工具 (2026) 🐴</div>', unsafe_allow_html=True)
 
     uploader_key = f"uploader_{st.session_state.uploader_key}"
     uploaded_files = st.file_uploader(
